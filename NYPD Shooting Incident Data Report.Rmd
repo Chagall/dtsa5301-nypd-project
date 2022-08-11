@@ -1,0 +1,379 @@
+---
+title: "NYPD Shooting Incident Data Report"
+author: "Fábio Alves Martins Pereira"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview of the project
+
+---
+
+In this project we are going to work on the data focusing on the comparison between the number of shooting incidents that happened on each day, on each of New York boroughs, and how many of these daily incidents ended up in murders.
+
+In this case we will focus specifically in incidents reported from January 1st of 2020 onwards (roughly since the COVID 19 pandemic started).
+
+---
+
+## 1 - Importing the data set
+
+---
+
+Here we import the libraries that are going to be used in the project. 
+
+```{r import_libraries, warning = FALSE, message = FALSE}
+library(tidyverse)  # Data tyding and plotting
+library(lubridate)  # Parsing dates
+```
+
+Now we download the **NYPD Shooting Incident Data (Historic)** from the website, and save it to a variable called **nypd_shooting_data**.
+
+```{r load_nypd_shooting_data, warning = FALSE, message = FALSE}
+nypd_shooting_data <- read_csv("https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD")
+```
+
+---
+
+## 2 - Tyding and transforming the data set
+
+---
+
+### 2.1 - Removing unwanted columns
+
+First we are going to remove from the data set the columns that will not be used. Since, for this analysis, we are only interested in the **dates** when the incidents occurred, the **borough** where they occurred, and **if the incident ended up in a murder or not**, we are only selecting these columns:
+
+- OCCUR_DATE
+- BORO
+- STATISTICAL_MURDER_FLAG
+
+```{r remove_columns}
+nypd_shooting_data <- nypd_shooting_data %>% select(c(OCCUR_DATE, BORO, STATISTICAL_MURDER_FLAG))
+```
+
+---
+
+### 2.2 - Renaming the columns
+
+Then we are going to rename the columns to a more friendly name format.
+
+- OCCUR_DATE is renamed to **occurrence_date**
+- BORO is renamed to **borough**
+- STATISTICAL_MURDER_FLAG is renamed to **murder**
+
+```{r rename_columns}
+colnames(nypd_shooting_data) <- c('occurrence_date','borough','murder')
+```
+
+---
+
+### 2.3 - Change the values in the murder column to a numeric format
+
+Then we are going to map the **murder** column values from Boolean values to 0's and 1's (numeric). 
+
+This will help us later to count how many shooting incidents each day ended up in murders.
+
+```{r change_murder_flag_from_boolean_to_number}
+nypd_shooting_data$murder <- ifelse(nypd_shooting_data$murder == TRUE, 0, 1)
+```
+
+Checking that the column is now of the **numeric** format
+
+```{r class_check_1}
+class(nypd_shooting_data$murder)
+```
+
+---
+
+### 2.4 - Change the values in the occurrence_date column to a Date format
+
+Another transforming step is to use the **mutate()** function with the **mdy()** function to convert the values in the occurrence_date column to a Date format, so the data can be plotted correctly later.
+
+```{r convert_to_date}
+nypd_shooting_data <- nypd_shooting_data %>% mutate(occurrence_date = mdy(occurrence_date))
+```
+
+Checking that the column is now of the **Date** format
+
+```{r class_check_2}
+class(nypd_shooting_data$occurrence_date)
+```
+
+---
+
+### 2.5 - Filter incident data prior to 2020-01-01
+
+Like we mentioned at the beginning of the project, we are only interested in the incidents that happened after the beginning of the COVID 19 pandemic.
+
+In this case we are considering it to be roughly after 2020-01-01, so we are going to filter all of the incidents prior to that date.
+
+```{r filter_after_covid_started}
+filtered_nypd_shooting_data <- nypd_shooting_data %>%
+  filter(occurrence_date > "2020-01-01")
+```
+
+---
+
+### 2.6 - Change the values in the borough column to factor format 
+
+The borough column is stored in the data set as a **character vector**. 
+
+However, since we know that there is a **limited number of boroughs in New York** we can change the column to a **categorical** variable, also known as **factor**, to get more precise information from it.
+
+```{r convert_to_factor}
+filtered_nypd_shooting_data$borough <- as.factor(filtered_nypd_shooting_data$borough)
+
+summary(filtered_nypd_shooting_data$borough)
+```
+We can see that the data set contains incidents from 5 different boroughs:
+
+- BRONX
+- BROOKLYN
+- MANHATTAN
+- QUEENS
+- STATEN ISLAND
+
+---
+
+### 2.6 - Grouping the data set by occurence date and borough
+
+Now we are going to group the data set by date and borough, counting the number of incidents and murders that happened on each day at each borough.
+
+```{r group, warning = FALSE, message = FALSE}
+nypd_shooting_data_by_date_borough <- filtered_nypd_shooting_data %>% 
+  group_by(occurrence_date, borough) %>% 
+  summarise(incidents = n(), murders = sum(murder))
+
+summary(nypd_shooting_data_by_date_borough)
+
+```
+
+
+## 3 - Visualizing the data
+
+---
+
+Here, to get a better look at the data, we are going to show in **line charts** the number of reported incidents and murders that happened on each of the boroughs since 2020-01-01.
+
+
+```{r plots}
+
+nypd_shooting_data_by_date_borough %>%
+  filter(borough == "BRONX") %>%
+  ggplot(aes(x = occurrence_date, y = incidents)) +
+  #geom_line(aes(color = "incidents")) +
+  geom_point(aes(color = "incidents")) +
+  #geom_line(aes(y = murders, color = "murders")) +
+  geom_point(aes(y = murders, color = "murders")) +
+  scale_color_manual(values=c('#5B9CD2','#D42828')) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 90)) +
+  labs(title = "Shooting incidents and murders in BRONX", y = NULL)
+
+
+nypd_shooting_data_by_date_borough %>%
+  filter(borough == "BROOKLYN") %>%
+  ggplot(aes(x = occurrence_date, y = incidents)) +
+  geom_line(aes(color = "incidents")) +
+  geom_point(aes(color = "incidents")) +
+  geom_line(aes(y = murders, color = "murders")) +
+  geom_point(aes(y = murders, color = "murders")) +
+  scale_color_manual(values=c('#5B9CD2','#D42828')) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 90)) +
+  labs(title = "Shooting incidents and murders in BROOKLYN", y = NULL)
+
+nypd_shooting_data_by_date_borough %>%
+  filter(borough == "MANHATTAN") %>%
+  ggplot(aes(x = occurrence_date, y = incidents)) +
+  geom_line(aes(color = "incidents")) +
+  geom_point(aes(color = "incidents")) +
+  geom_line(aes(y = murders, color = "murders")) +
+  geom_point(aes(y = murders, color = "murders")) +
+  scale_color_manual(values=c('#5B9CD2','#D42828')) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 90)) +
+  labs(title = "Shooting incidents and murders in MANHATTAN", y = NULL)
+
+nypd_shooting_data_by_date_borough %>%
+  filter(borough == "QUEENS") %>%
+  ggplot(aes(x = occurrence_date, y = incidents)) +
+  geom_line(aes(color = "incidents")) +
+  geom_point(aes(color = "incidents")) +
+  geom_line(aes(y = murders, color = "murders")) +
+  geom_point(aes(y = murders, color = "murders")) +
+  scale_color_manual(values=c('#5B9CD2','#D42828')) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 90)) +
+  labs(title = "Shooting incidents and murders in QUEENS", y = NULL)
+
+
+nypd_shooting_data_by_date_borough %>%
+  filter(borough == "STATEN ISLAND") %>%
+  ggplot(aes(x = occurrence_date, y = incidents)) +
+  geom_line(aes(color = "incidents")) +
+  geom_point(aes(color = "incidents")) +
+  geom_line(aes(y = murders, color = "murders")) +
+  geom_point(aes(y = murders, color = "murders")) +
+  scale_color_manual(values=c('#5B9CD2','#D42828')) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 90)) +
+  labs(title = "Shooting incidents and murders in STATEN ISLAND", y = NULL)
+```
+
+
+## 4 - Analyzing and comparing the data
+
+---
+
+### 4.1 - Summary of the BRONX incidents
+
+```{r bronx_summary}
+summary(nypd_shooting_data_by_date_borough  %>%
+  filter(borough == "BRONX"))
+```
+
+Here we can see that **BRONX** had a total of **495** reported shooting incidents since the beginning of 2020.
+
+On an **average**, there had been **2.43** shooting incidents each day, of which **1.917** tended to end up in a murder.
+
+The **daily lethality rate** of the shooting incidents (avg of murders per day / avg incidents per day) was: **0.788**.
+
+---
+
+### 4.2 - Summary of the BROOKLYN incidents
+
+```{r brooklyn_summary}
+summary(nypd_shooting_data_by_date_borough  %>%
+  filter(borough == "BROOKLYN"))
+```
+
+Here we can see that **BROOKLYN** had a total of **524** reported shooting incidents since the beginning of 2020.
+
+On an **average**, there had been **2.765** shooting incidents each day, of which **2.225** tended to end up in a murder.
+
+The **daily lethality rate** of the shooting incidents (avg of murders per day / avg incidents per day) was: **0.804**.
+
+---
+
+### 4.3 - Summary of the MANHATTAN incidents
+
+```{r manhattan_summary}
+summary(nypd_shooting_data_by_date_borough  %>%
+  filter(borough == "MANHATTAN"))
+```
+
+Here we can see that **MANHATTAN** had a total of **335** reported shooting incidents since the beginning of 2020.
+
+On an **average**, there had been **1.833** shooting incidents each day, of which **1.519** tended to end up in a murder.
+
+The **daily lethality rate** of the shooting incidents (avg of murders per day / avg incidents per day) was: **0.828**.
+
+---
+
+### 4.4 - Summary of the QUEENS incidents
+
+```{r queens_summary}
+summary(nypd_shooting_data_by_date_borough  %>%
+  filter(borough == "QUEENS"))
+```
+
+Here we can see that **QUEENS** had a total of **334** reported shooting incidents since the beginning of 2020.
+
+On an **average**, there had been **1.793** shooting incidents each day, of which **1.431** tended to end up in a murder.
+
+The **daily lethality rate** of the shooting incidents (avg of murders per day / avg incidents per day) was: **0.798**.
+
+---
+
+### 4.5 - Summary of the STATEN ISLAND incidents
+
+```{r staten_island_summary}
+summary(nypd_shooting_data_by_date_borough  %>%
+  filter(borough == "STATEN ISLAND"))
+```
+
+Here we can see that **QUEENS** had a total of **72** reported shooting incidents since the beginning of 2020.
+
+On an **average**, there had been **1.25** shooting incidents each day, of which **0.8611** tended to end up in a murder.
+
+The **daily lethality rate** of the shooting incidents (avg of murders per day / avg incidents per day) was: **0.688**.
+
+---
+
+### 4.6 - Analysis conclusion
+
+Analyzing the the data above we discovered that since the beginning of the pandemic **(2020-01-01)**:
+
+- **BROOKLYN** was the borough that had the most reported shooting incidents: **524**. From numbers alone, it makes sense because  **BROOKLYN** is the borough with the highest population count.**\* **
+- **STATEN ISLAND** was the borough that had the least amount of reported shooting incidents: **72**. This could be either due to the fact that it is the borough with the lowest population count **\* **, which makes sense, or because of under reporting of incidents.
+- **STATEN INSLAND** was also the borough with the lowest lethality rate: **0.688**.
+- Although **BROOKLYN** had the most reported shootings, **MANHATTAN** had the highest lethality rate of the boroughs: **0.828**. That means that you were most likely to be killed if you were shot in **MANHATTAN** than on any of the other boroughs.
+
+
+The population count was retrieved from the [2020 USA Census](https://mtgis-portal.geo.census.gov/arcgis/apps/MapSeries/index.html?appid=2566121a73de463995ed2b2fd7ff6eb7).*
+
+---
+
+## 5 - Modeling 
+
+---
+
+In this modeling part we are going to apply a **linear model** to see how well the number of murders are predicted by the number of incidents.
+
+In this case we are going to consider all of the historic shooting incidents available data, not only data from the start of 2020 onwards.
+
+```{r group_by_date}
+group_by_date <- nypd_shooting_data %>% 
+  group_by(occurrence_date) %>% 
+  summarise(incidents = n(), murders = sum(murder))
+```
+
+Then we create our model 
+
+```{r create_lm}
+mod <- lm(murders ~ incidents, data = group_by_date)
+```
+
+And for the data available, we try to predict the number of murders based on the number of incidents each day, and save the result to the *pred* column.
+
+```{r add_pred_column}
+group_by_date <- group_by_date %>% mutate(pred = predict(mod))
+```
+
+
+Now we plot the actual murders data in blue and the prediction in red.
+
+```{r plot_lm_prediction}
+
+group_by_date %>%
+  ggplot(aes(x = incidents, y = murders)) +
+  geom_line(aes(color = "murders")) +
+  geom_point(aes(color = "murders")) +
+  geom_line(aes(y = pred, color = "pred")) +
+  geom_point(aes(y = pred, color = "pred")) +
+  scale_color_manual(values=c('#5B9CD2','#D42828')) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 90))
+```
+
+From the prediction above it seems like the number of incidents are indeed an indicator of the number murders. 
+
+It model does a good job of predicting at the lower end and at the higher end, but it is not very good in between, indicating that we might need more variables other than the number of incidents to better predict the number of murders.
+
+---
+
+## 6 - Identifying sources of bias
+
+---
+
+From a personal perspective I must identify that I was inclined to believe, even before analyzing the data, that Bronx would be the borough with the highest number of incidents and also the highest lethality rate (number of murders / number of shooting incidents).
+
+I had this bias because I was led to believe that Bronx was one of the most violent boroughs in New York, either by watching TV news, or by personal acquaintances stories.
+
+Another source of bias could be identified in the amount of reported incidents on each of the boroughs. Some boroughs are clearly are more populated than others, and to make the analysis fairer, we could have randomly sampled the same amount of incidents for each of the boroughs, to avoid a discrepancy in the number of reported incidents. 
