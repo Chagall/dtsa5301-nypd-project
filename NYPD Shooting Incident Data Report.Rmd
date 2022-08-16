@@ -166,9 +166,9 @@ Here, to get a better look at the data, we are going to show in **line charts** 
 nypd_shooting_data_by_date_borough %>%
   filter(borough == "BRONX") %>%
   ggplot(aes(x = occurrence_date, y = incidents)) +
-  #geom_line(aes(color = "incidents")) +
+  geom_line(aes(color = "incidents")) +
   geom_point(aes(color = "incidents")) +
-  #geom_line(aes(y = murders, color = "murders")) +
+  geom_line(aes(y = murders, color = "murders")) +
   geom_point(aes(y = murders, color = "murders")) +
   scale_color_manual(values=c('#5B9CD2','#D42828')) +
   theme(legend.position = "bottom",
@@ -364,7 +364,7 @@ group_by_date %>%
 
 From the prediction above it seems like the number of incidents are indeed an indicator of the number murders. 
 
-It model does a good job of predicting at the lower end and at the higher end, but it is not very good in between, indicating that we might need more variables other than the number of incidents to better predict the number of murders.
+The model does a good job of predicting at the lower end and at the higher end, but it is not very good in between, indicating that we might need more variables other than the number of incidents to better predict the number of murders.
 
 ---
 
